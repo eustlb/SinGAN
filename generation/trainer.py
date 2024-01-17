@@ -4,6 +4,9 @@ import models
 import os
 import torch
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
 from utils.core import imresize
 from torch.optim.lr_scheduler import StepLR
 from torch.autograd import grad as torch_grad, Variable
@@ -50,7 +53,6 @@ class Trainer():
             self.g_model.scale_factor = self.args.scale_factor
             self.init_generator = False
             loader.dataset.amps = {'s0': torch.tensor(1.).to(self.args.device)}
-            self.prev_state_keys = [] # empty list
         else:
             # add amp
             data = next(iter(loader))
@@ -67,43 +69,6 @@ class Trainer():
 
             # add scale
             self.g_model.add_scale(self.args.device)
-
-        self.d_model = self.d_model.to('cpu')
-        self.g_model = self.g_model.to('cpu')
-
-        # load weights
-        if self.args.models_to_load:
-
-            logging.info('\n')
-            logging.info(f'Loading models... scale {self.scale + 1}')
-
-            # generator
-            current_state_keys = self.prev_state_keys.copy()
-
-            pt_path_g = os.path.join(self.args.models_to_load, f"{self.scale}.pt")
-            s_dict_g = torch.load(pt_path_g, map_location='cpu')
-
-            names = list(s_dict_g.keys())
-            for name in names:
-                if name in self.prev_state_keys:
-                    s_dict_g.pop(name)
-                else:
-                    current_state_keys.append(name)
-
-            self.g_model.load_state_dict(s_dict_g, strict=False)
-            self.prev_state_keys = current_state_keys
-
-            logging.info(f'generator loaded !')
-
-            # discriminator
-            pt_path_d = os.path.join(self.args.models_to_load, f"{self.scale}_d.pt")
-            s_dict_d = torch.load(pt_path_d, map_location='cpu')
-            self.d_model.load_state_dict(s_dict_d)
-
-            logging.info(f'discriminator loaded !')
-
-        self.d_model = self.d_model.to(self.args.device)
-        self.g_model = self.g_model.to(self.args.device)
 
         # print model
         if self.print_model:
@@ -177,6 +142,8 @@ class Trainer():
         real = imresize(real, self.args.scale_one)
         loader.dataset.reals = self._set_reals(real)
 
+        #print("loader.dataset.reals", loader.dataset.reals['s2'].shape)
+        
         # set noises
         loader.dataset.noises = self._set_noises(loader.dataset.reals)
 
@@ -203,6 +170,7 @@ class Trainer():
         self.args.scale_to_stop = math.ceil(math.log(min([self.args.max_size, max([image_resized.size(2), image_resized.size(3)])]) / max([image_resized.size(2), image_resized.size(3)]), self.args.scale_factor_init))
         self.args.stop_scale = self.args.num_scales - self.args.scale_to_stop
 
+############ TO MODIFY ################
     def _set_reals(self, real):
         reals = {}
 
@@ -210,6 +178,8 @@ class Trainer():
         for i in range(self.args.stop_scale + 1):
             s = math.pow(self.args.scale_factor, self.args.stop_scale - i)
             reals.update({'s{}'.format(i): imresize(real.clone().detach(), s).squeeze(dim=0)})
+            #print('################# {} ##############'.format(i))
+            #print(reals['s{}'.format(i)].shape)
 
         return reals
 
@@ -254,14 +224,31 @@ class Trainer():
 
         # get generated data
         generated_data = self.g_model(reals, amps)
-
+#####
+        #print("reals[self.key] : ", reals[self.key].detach().cpu().numpy().shape)
+        #print(reals[self.key].detach().cpu().numpy()[0,0,:])
+#####
         # zero grads
         self.d_optimizer.zero_grad()
 
         # calculate probabilities on real and generated data
         d_real = self.d_model(reals[self.key])
-        d_generated = self.d_model(generated_data.detach())
+#####
+        #print("reals[self.key] : ", reals[self.key].detach().cpu().numpy().shape)
+        
+        #image_array = reals[self.key].detach().cpu().numpy()
+        #image = np.squeeze(image_array).transpose(1, 2, 0)
+        #image = (image - np.min(image)) / (np.max(image) - np.min(image))
+        #image = image.astype(np.float32)
+        #plt.imshow(image)
+        #plt.axis('off')
+        #plt.savefig('saved_image.png', bbox_inches='tight', pad_inches=0, transparent=True)
+        #plt.close()
+        
+        #plt.imshow(reals)
+#####
 
+        d_generated = self.d_model(generated_data.detach())
         # create total loss and optimize
         loss_r = -d_real.mean()
         loss_f = d_generated.mean()
@@ -408,6 +395,12 @@ class Trainer():
     def _train_single_scale(self, loader):
         # run step iterations
         logging.info('\nScale #{}'.format(self.scale + 1))
+
+        #if self.scale == 2:
+        #    self.args.num_steps = 12000
+        #else :
+        #    self.args.num_steps = 4000
+
         for self.step in range(self.args.num_steps + 1):
             # train
             self._train_iteration(loader)
