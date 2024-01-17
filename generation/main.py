@@ -41,6 +41,7 @@ def get_arguments():
     parser.add_argument('--penalty-weight', default=0.1, type=float, help='gradient penalty weight (default: 0.1)')
     parser.add_argument('--reconstruction-weight', default=10., type=float, help='reconstruction-weight (default: 10)')
     parser.add_argument('--adversarial-weight', default=1., type=float, help='adversarial-weight (default: 1)')
+    parser.add_argument('--custom', default=1, type=int, help='custom crop dataset (default 1)')
 
     parser.add_argument('--seed', default=-1, type=int, help='random seed (default: random)')
     parser.add_argument('--print-every', default=200, type=int, help='print-every (default: 200)')
