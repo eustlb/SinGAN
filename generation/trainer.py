@@ -50,6 +50,7 @@ class Trainer():
             self.g_model.scale_factor = self.args.scale_factor
             self.init_generator = False
             loader.dataset.amps = {'s0': torch.tensor(1.).to(self.args.device)}
+            self.prev_state_keys = [] # empty list
         else:
             # add amp
             data = next(iter(loader))
@@ -66,6 +67,43 @@ class Trainer():
 
             # add scale
             self.g_model.add_scale(self.args.device)
+
+        self.d_model = self.d_model.to('cpu')
+        self.g_model = self.g_model.to('cpu')
+
+        # load weights
+        if self.args.models_to_load:
+
+            logging.info('\n')
+            logging.info(f'Loading models... scale {self.scale + 1}')
+
+            # generator
+            current_state_keys = self.prev_state_keys.copy()
+
+            pt_path_g = os.path.join(self.args.models_to_load, f"{self.scale}.pt")
+            s_dict_g = torch.load(pt_path_g, map_location='cpu')
+
+            names = list(s_dict_g.keys())
+            for name in names:
+                if name in self.prev_state_keys:
+                    s_dict_g.pop(name)
+                else:
+                    current_state_keys.append(name)
+
+            self.g_model.load_state_dict(s_dict_g, strict=False)
+            self.prev_state_keys = current_state_keys
+
+            logging.info(f'generator loaded !')
+
+            # discriminator
+            pt_path_d = os.path.join(self.args.models_to_load, f"{self.scale}_d.pt")
+            s_dict_d = torch.load(pt_path_d, map_location='cpu')
+            self.d_model.load_state_dict(s_dict_d)
+
+            logging.info(f'discriminator loaded !')
+
+        self.d_model = self.d_model.to(self.args.device)
+        self.g_model = self.g_model.to(self.args.device)
 
         # print model
         if self.print_model:

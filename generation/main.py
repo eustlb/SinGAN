@@ -49,6 +49,7 @@ def get_arguments():
     parser.add_argument('--save', metavar='SAVE', default='', help='saved folder')
     parser.add_argument('--evaluation', default=False, action='store_true', help='evaluate a model (default: false)')
     parser.add_argument('--model-to-load', default='', help='evaluating from file (default: None)')
+    parser.add_argument('--models-to-load', default='', help='initializing params from file (default: None)')
     parser.add_argument('--amps-to-load', default='', help='evaluating from file (default: None)')
     parser.add_argument('--use-tb', default=False, action='store_true', help='use tensorboardx (default: false)')
     args = parser.parse_args()
